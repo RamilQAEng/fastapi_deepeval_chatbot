@@ -33,3 +33,4 @@ repos:
           - pytest
           - uvicorn
           - deepeval
+          - types-aiofiles

@@ -1,12 +1,18 @@
+import traceback
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import aiofiles
 from deepeval import evaluate as deepeval_evaluate
 from deepeval.metrics import AnswerRelevancyMetric, ContextualPrecisionMetric, FaithfulnessMetric
 from deepeval.metrics.base_metric import BaseMetric
+from deepeval.models import GPTModel
 from deepeval.test_case import LLMTestCase
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.models.evaluation import Dataset, EvaluationResult, EvaluationRun, RunStatus
 
 
@@ -43,10 +49,6 @@ class EvaluationService:
                 context=item.get("context"),
             )
             test_cases.append(tc)
-
-        from deepeval.models import GPTModel
-
-        from src.core.config import settings
 
         # Configure model for evaluation (OpenRouter)
         # GPTModel accepts base_url and api_key directly
@@ -92,16 +94,11 @@ class EvaluationService:
             logger.error(f"Evaluation Run {run.id} Failed", exc_info=True)
 
             # Keep detailed traceback as fallback/debug artifact
-            import traceback
-            import aiofiles
 
             async with aiofiles.open("evaluation_errors.log", "a") as f:
                 await f.write(f"Run {run.id} Failed: {e}\n")
                 await f.write(traceback.format_exc())
                 await f.write("-" * 50 + "\n")
-
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
 
         run.finished_at = datetime.now(ZoneInfo("UTC"))
         await self.db.commit()
