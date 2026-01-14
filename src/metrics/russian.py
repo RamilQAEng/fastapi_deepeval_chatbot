@@ -96,9 +96,9 @@ def russian_answer_relevancy_generate_reason(
 
 # Apply monkeypatches
 # Note: mypy doesn't allow method reassignment, so we use type: ignore[method-assign]
-faithful_tpl.FaithfulnessTemplate.generate_reason = staticmethod(
+faithful_tpl.FaithfulnessTemplate.generate_reason = staticmethod(  # type: ignore[method-assign]
     russian_faithfulness_generate_reason
 )
-relevancy_tpl.AnswerRelevancyTemplate.generate_reason = staticmethod(
+relevancy_tpl.AnswerRelevancyTemplate.generate_reason = staticmethod(  # type: ignore[method-assign]
     russian_answer_relevancy_generate_reason
 )

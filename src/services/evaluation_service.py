@@ -67,7 +67,7 @@ class EvaluationService:
 
         try:
             # Run DeepEval
-            evaluation_result: Any = deepeval_evaluate(test_cases, metric_objects)
+            evaluation_result: Any = deepeval_evaluate(test_cases, metric_objects)  # type: ignore[operator]
 
             # Save results
             for res in evaluation_result.test_results:
@@ -93,11 +93,12 @@ class EvaluationService:
 
             # Keep detailed traceback as fallback/debug artifact
             import traceback
+            import aiofiles
 
-            with open("evaluation_errors.log", "a") as f:
-                f.write(f"Run {run.id} Failed: {e}\n")
-                f.write(traceback.format_exc())
-                f.write("-" * 50 + "\n")
+            async with aiofiles.open("evaluation_errors.log", "a") as f:
+                await f.write(f"Run {run.id} Failed: {e}\n")
+                await f.write(traceback.format_exc())
+                await f.write("-" * 50 + "\n")
 
         from datetime import datetime
         from zoneinfo import ZoneInfo
