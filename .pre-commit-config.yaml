@@ -23,4 +23,12 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-requests, types-ujson]
+        additional_dependencies:
+          - types-requests
+          - types-ujson
+          - pydantic>=2.0
+          - pydantic-settings
+          - sqlalchemy>=2.0
+          - fastapi
+          - pytest
+          - uvicorn

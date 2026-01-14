@@ -151,6 +151,6 @@ async def get_dataset_template() -> dict[str, Any]:
                 expected_output="Golden Answer",
                 context=["Golden context"],
             )
-        ]
+        ],
     )
     return sample.model_dump()

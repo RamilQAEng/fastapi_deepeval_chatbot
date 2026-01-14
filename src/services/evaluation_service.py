@@ -67,7 +67,7 @@ class EvaluationService:
 
         try:
             # Run DeepEval
-            evaluation_result: Any = deepeval_evaluate(test_cases, metric_objects)  # type: ignore[operator]
+            evaluation_result: Any = deepeval_evaluate(test_cases, metric_objects)
 
             # Save results
             for res in evaluation_result.test_results:

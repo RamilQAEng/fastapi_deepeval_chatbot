@@ -1,7 +1,7 @@
 
 # 🧠 RAG Evaluation System (Pet Project)
 
-A robust, production-ready system to **generate**, **manage**, and **evaluate** synthetic datasets for RAG (Retrieval-Augmented Generation) pipelines. 
+A robust, production-ready system to **generate**, **manage**, and **evaluate** synthetic datasets for RAG (Retrieval-Augmented Generation) pipelines.
 
 Built with **FastAPI**, **PostgreSQL**, **DeepEval**, and **OpenRouter**.
 
