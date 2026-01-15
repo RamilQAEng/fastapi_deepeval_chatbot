@@ -230,11 +230,7 @@ def print_quality_group(quality: str, items: list) -> None:
         return
 
     print(f"\n{'─' * 80}")
-    quality_ranges = {
-        "excellent": "0.9-1.0",
-        "medium": "0.5-0.7",
-        "poor": "0.0-0.3"
-    }
+    quality_ranges = {"excellent": "0.9-1.0", "medium": "0.5-0.7", "poor": "0.0-0.3"}
     expected_range = quality_ranges.get(quality, "N/A")
     print(f"{quality.upper()} QUALITY ANSWER (Expected: {expected_range})")
     print("─" * 80)
@@ -290,7 +286,7 @@ def _print_question_metrics(idx: int, q_data: dict, matching_results: list) -> N
     """Print detailed metrics for a single question."""
     question = q_data["question"]
     expected_quality = q_data["expected_quality"]
-    
+
     # Print question header
     quality_ranges = {"excellent": "0.9-1.0", "medium": "0.5-0.7", "poor": "0.0-0.3"}
     expected_range = quality_ranges.get(expected_quality, "N/A")

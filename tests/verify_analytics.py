@@ -9,6 +9,7 @@ from src.core.db import async_session_maker
 from src.services.evaluation_service import EvaluationService
 from sqlalchemy import text
 
+
 async def main():
     print("Starting Analytics Verification...")
 
@@ -23,11 +24,11 @@ async def main():
             return
 
         service = EvaluationService(db)
-        
+
         # Get latest run
         result = await db.execute(text("SELECT id FROM evaluation_runs ORDER BY id DESC LIMIT 1"))
         run_id = result.scalar()
-        
+
         if not run_id:
             print("No runs found in DB. Skipping logic check.")
             return
@@ -51,15 +52,10 @@ async def main():
         questions_map = {}
         for result in data.results:
             if result.input not in questions_map:
-                questions_map[result.input] = {
-                    "output": result.output,
-                    "metrics": []
-                }
-            questions_map[result.input]["metrics"].append({
-                "name": result.metric,
-                "score": result.score,
-                "reason": result.reason
-            })
+                questions_map[result.input] = {"output": result.output, "metrics": []}
+            questions_map[result.input]["metrics"].append(
+                {"name": result.metric, "score": result.score, "reason": result.reason}
+            )
 
         # Print detailed Q&A with metrics
         for idx, (question, qa_data) in enumerate(questions_map.items(), 1):
@@ -69,10 +65,10 @@ async def main():
             print("\nAnswer:")
             print(f"  {qa_data['output']}")
             print("\nMetrics:")
-            for metric in qa_data['metrics']:
-                score_emoji = "[PASS]" if metric['score'] >= 0.5 else "[FAIL]"
+            for metric in qa_data["metrics"]:
+                score_emoji = "[PASS]" if metric["score"] >= 0.5 else "[FAIL]"
                 print(f"  {score_emoji} {metric['name']}: {metric['score']}")
-                if metric['reason']:
+                if metric["reason"]:
                     print(f"     └─ Reasoning: {metric['reason']}")
 
         # Final summary stats
@@ -90,6 +86,7 @@ async def main():
 
         print("=" * 80)
         print("Analytics Logic Verified!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
