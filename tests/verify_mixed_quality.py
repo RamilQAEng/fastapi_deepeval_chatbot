@@ -10,6 +10,7 @@ import asyncio
 import json
 import sys
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -25,15 +26,16 @@ def get_msk_time() -> str:
 
 # Common retrieval context strings
 PRICE_OBJECTION_CONTEXT = (
-    "Если клиент утверждает, что нашел более дешевое предложение на Лада Веста Sport в другом месте, "
-    "не предлагайте скидку сразу. Сначала подчеркните, что в нашу цену включена гарантия 'Полная Защита' "
-    "стоимостью 150,000 рублей."
+    "Если клиент утверждает, что нашел более дешевое предложение на Лада Веста Sport на "
+    "другом ресурсе, не предлагайте скидку сразу. Сначала подчеркните, что в нашу цену "
+    "включена гарантия 'Полная Защита' стоимостью 150,000 рублей."
 )
 
 CANCELLATION_CONTEXT = (
     "Клиенты, звонящие с отменой в течение 24 часов, часто испытывают сомнения после покупки. "
     "Менеджер должен назначить видеозвонок для повторной демонстрации функций автомобиля. "
-    "Не обрабатывайте отмену по телефону/email без устного подтверждения от специалиста по удержанию."
+    "Не обрабатывайте отмену по телефону/email без устного подтверждения от "
+    "специалиста по удержанию."
 )
 
 # Test data with mixed quality answers (Russian)
@@ -43,73 +45,122 @@ MIXED_QUALITY_DATASET = {
         # === ОТЛИЧНЫЕ ОТВЕТЫ (3) ===
         {
             "question": "Какая гарантия предоставляется на Лада Веста Sport?",
-            "answer": "На Лада Веста Sport предоставляется расширенная гарантия 'Полная Защита' стоимостью 150,000 рублей, которая уже включена в цену. Эта гарантия покрывает все основные узлы и агрегаты автомобиля и обеспечивает защиту на 5 лет.",
+            "answer": (
+                "На Лада Веста Sport предоставляется расширенная гарантия 'Полная Защита' "
+                "стоимостью 150,000 рублей, которая уже включена в цену. Эта гарантия покрывает "
+                "все основные узлы и агрегаты автомобиля и обеспечивает защиту на 5 лет."
+            ),
             "retrieval_context": [PRICE_OBJECTION_CONTEXT],
             "expected_quality": "excellent",
         },
         {
             "question": "Как обрабатывать возражения по цене на Лада Веста Sport?",
-            "answer": "При обработке возражений по цене на Лада Веста Sport сначала подчеркните гарантию 'Полная Защита', включенную в цену и оцениваемую в 150,000 рублей. Если клиент все равно настаивает на отказе от покупки, менеджер уполномочен предложить либо скидку 3%, либо бесплатный комплект зимних шин.",
+            "answer": (
+                "При обработке возражений по цене на Лада Веста Sport сначала подчеркните гарантию "
+                "'Полная Защита', включенную в цену и оцениваемую в 150,000 рублей. Если клиент "
+                "все равно настаивает на отказе от покупки, менеджер уполномочен предложить либо "
+                "скидку 3%, либо бесплатный комплект зимних шин."
+            ),
             "retrieval_context": [
-                "Если клиент утверждает, что нашел более дешевое предложение на Лада Веста Sport в другом месте, не предлагайте скидку сразу. Сначала подчеркните, что в нашу цену включена гарантия 'Полная Защита' стоимостью 150,000 рублей. Если клиент все равно настаивает на отмене сделки, менеджер может предложить скидку 3% или бесплатный комплект зимних шин."
+                "Если клиент утверждает, что нашел более дешевое предложение на Лада Веста Sport "
+                "в другом месте, не предлагайте скидку сразу. Сначала подчеркните, что в нашу "
+                "цену включена гарантия 'Полная Защита' стоимостью 150,000 рублей. Если клиент "
+                "все равно настаивает на отмене сделки, менеджер может предложить скидку 3% или "
+                "бесплатный комплект зимних шин."
             ],
             "expected_quality": "excellent",
         },
         {
-            "question": "Что должны делать менеджеры, когда клиент хочет отказаться от покупки в течение 24 часов?",
-            "answer": "Когда клиенты звонят, чтобы отменить покупку в течение 24 часов из-за сомнений, менеджер должен назначить видеозвонок для повторной демонстрации возможностей автомобиля. Мы не обрабатываем отмену по телефону или email без устного подтверждения от специалиста по удержанию клиентов.",
+            "question": (
+                "Что должны делать менеджеры, когда клиент хочет отказаться от покупки в "
+                "течение 24 часов?"
+            ),
+            "answer": (
+                "Когда клиенты звонят, чтобы отменить покупку в течение 24 часов из-за сомнений, "
+                "менеджер должен назначить видеозвонок для повторной демонстрации возможностей "
+                "автомобиля. Мы не обрабатываем отмену по телефону или email без устного "
+                "подтверждения от специалиста по удержанию клиентов."
+            ),
             "retrieval_context": [CANCELLATION_CONTEXT],
             "expected_quality": "excellent",
         },
         # === СРЕДНИЕ ОТВЕТЫ (3) ===
         {
             "question": "Можем ли мы увеличить стоимость trade-in, если клиент недоволен?",
-            "answer": "Да, мы можем увеличить стоимость trade-in до 50,000 рублей в определенных случаях. Это помогает удержать клиентов, рассматривающих другие автосалоны.",
+            "answer": (
+                "Да, мы можем увеличить стоимость trade-in до 50,000 рублей в определенных случаях."
+                "Это помогает удержать клиентов, рассматривающих другие автосалоны."
+            ),
             "retrieval_context": [
-                "Если клиент недоволен оценкой trade-in, объясните, что наша оценка включает отмену комиссии за удобство. Мы можем увеличить стоимость trade-in на сумму до 50,000 рублей, если клиент оформит кредит в нашем банке-партнере."
+                "Если клиент недоволен оценкой trade-in, объясните, что наша оценка включает"
+                "отмену комиссии за удобство. Мы можем увеличить стоимость trade-in на сумму до"
+                "50,000 рублей, если клиент оформит кредит в нашем банке-партнере."
             ],
             "expected_quality": "medium",  # Пропущено условие про кредит
         },
         {
             "question": "Какую скидку могут предложить менеджеры для удержания клиента?",
-            "answer": "Менеджеры могут предложить скидку 3% клиентам, желающим отменить покупку. Это часть нашей стратегии удержания.",
+            "answer": (
+                "Менеджеры могут предложить скидку 3% клиентам, желающим отменить покупку. "
+                "Это часть нашей стратегии удержания."
+            ),
             "retrieval_context": [
-                "Если клиент все равно настаивает на отмене сделки, менеджер может предложить скидку 3% или бесплатный комплект зимних шин."
+                "Если клиент все равно настаивает на отмене сделки, менеджер может предложить "
+                "скидку 3% или бесплатный комплект зимних шин."
             ],
             "expected_quality": "medium",  # Пропущена альтернатива (зимние шины)
         },
         {
             "question": "Как мы обрабатываем запросы на отмену покупки?",
-            "answer": "Мы должны постараться понять проблемы клиента и найти с ним решение. Наша команда по удержанию обучена помогать в таких ситуациях.",
+            "answer": "Мы должны постараться понять проблемы клиента и найти с ним решение."
+            "Наша команда по удержанию обучена помогать в таких ситуациях.",
             "retrieval_context": [CANCELLATION_CONTEXT],
             "expected_quality": "medium",  # Слишком расплывчато, пропущены конкретные процедуры
         },
         # === ПЛОХИЕ ОТВЕТЫ (4) ===
         {
             "question": "Что включено в гарантию на Лада Веста Sport?",
-            "answer": "Лада Веста Sport поставляется со стандартной гарантией 1 год, покрывающей базовые механические неисправности. Расширенная гарантия может быть приобретена отдельно за дополнительную плату.",
+            "answer": (
+                "Лада Веста Sport поставляется со стандартной гарантией 1 год, покрывающей базовые "
+                "механические неисправности. Расширенная гарантия может быть приобретена отдельно "
+                "за дополнительную плату."
+            ),
             "retrieval_context": [PRICE_OBJECTION_CONTEXT],
             "expected_quality": "poor",  # Противоречит политике (Полная Защита включена)
         },
         {
-            "question": "Должны ли мы сразу предлагать скидки, когда клиенты упоминают конкурентов?",
-            "answer": "Да, конечно! Мы должны немедленно соответствовать или превосходить цену конкурента, чтобы не потерять продажу. Удовлетворенность клиентов - наш главный приоритет.",
+            "question": (
+                "Должны ли мы сразу предлагать скидки, когда клиенты упоминают конкурентов?"
+            ),
+            "answer": (
+                "Да, конечно! Мы должны немедленно соответствовать или"
+                "превосходить цену конкурента, "
+                "чтобы не потерять продажу. Удовлетворенность клиентов - наш главный приоритет."
+            ),
             "retrieval_context": [PRICE_OBJECTION_CONTEXT],
             "expected_quality": "poor",  # Прямо противоречит политике
         },
         {
             "question": "Можем ли мы обработать отмену покупки по email?",
-            "answer": "Да, для удобства клиента мы можем обработать отмену по email или телефону. Просто отправьте запрос на отмену в нашу службу поддержки.",
+            "answer": (
+                "Да, для удобства клиента мы можем обработать отмену по email или телефону. Просто "
+                "отправьте запрос на отмену в нашу службу поддержки."
+            ),
             "retrieval_context": [
-                "Не обрабатывайте отмену по телефону/email без устного подтверждения от специалиста по удержанию."
+                "Не обрабатывайте отмену по телефону/email без устного подтверждения от "
+                "специалиста по удержанию."
             ],
             "expected_quality": "poor",  # Нарушает требование политики
         },
         {
             "question": "Какова наша комиссия за удобство при trade-in?",
-            "answer": "Наш автосалон взимает комиссию за удобство в размере 15,000 рублей за все транзакции trade-in. Эта комиссия покрывает административные расходы на обработку.",
+            "answer": (
+                "Наш автосалон взимает комиссию за удобство в размере 15,000 рублей за все "
+                "транзакции trade-in. Эта комиссия покрывает административные расходы на обработку."
+            ),
             "retrieval_context": [
-                "Если клиент недоволен оценкой trade-in, объясните, что наша оценка включает отмену комиссии за удобство."
+                "Если клиент недоволен оценкой trade-in, объясните, что наша оценка включает "
+                "отмену комиссии за удобство."
             ],
             "expected_quality": "poor",  # Галлюцинация - комиссия отменена, а не взимается
         },
@@ -214,58 +265,9 @@ def get_score_emoji(score: float) -> str:
     return "[FAIL]"
 
 
-def print_metric(metric_name: str, metric_data: dict) -> None:
-    """Print a single metric result."""
-    score = metric_data.get("score", 0.0)
-    reason = metric_data.get("reason", "N/A")
-    emoji = get_score_emoji(score)
-
-    print(f"  {emoji} {metric_name}: {score:.2f}")
-    print(f"     └─ {reason}")
-
-
-def print_quality_group(quality: str, items: list) -> None:
-    """Print results for a single quality tier."""
-    if not items:
-        return
-
-    print(f"\n{'─' * 80}")
-    quality_ranges = {"excellent": "0.9-1.0", "medium": "0.5-0.7", "poor": "0.0-0.3"}
-    expected_range = quality_ranges.get(quality, "N/A")
-    print(f"{quality.upper()} QUALITY ANSWER (Expected: {expected_range})")
-    print("─" * 80)
-
-    for idx, result in items:
-        question = MIXED_QUALITY_DATASET["questions"][idx - 1]["question"]
-        metrics = result.get("metrics", {})
-
-        print(f"\nQ{idx}: {question}")
-
-        for metric_name, metric_data in metrics.items():
-            print_metric(metric_name, metric_data)
-
-
-def print_summary_stats(stats: list) -> None:
-    """Print summary statistics."""
-    print("\n" + "=" * 80)
-    print("SUMMARY STATISTICS")
-    print("=" * 80)
-
-    for stat in stats:
-        name = stat.get("name", "Unknown")
-        avg = stat.get("avg_score", 0.0)
-        pass_rate = stat.get("pass_rate", 0.0) * 100
-        passed = stat.get("passed_count", 0)
-        total = stat.get("total_count", 0)
-
-        print(f"\n{name}:")
-        print(f"   • Average Score: {avg:.2f}")
-        print(f"   • Pass Rate: {pass_rate:.1f}% ({passed}/{total})")
-
-
-def _group_results_by_question(results: list) -> dict[str, list]:
+def _group_results_by_question(results: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
     """Group results by input text."""
-    question_results: dict[str, list] = {}
+    question_results: dict[str, list[dict[str, Any]]] = {}
     for result in results:
         input_text = result.get("input", "")
         if input_text not in question_results:
@@ -274,7 +276,9 @@ def _group_results_by_question(results: list) -> dict[str, list]:
     return question_results
 
 
-def _find_matching_results(question: str, question_results: dict[str, list]) -> list:
+def _find_matching_results(
+    question: str, question_results: dict[str, list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
     """Find results matching a specific question."""
     for input_key, res_list in question_results.items():
         if question in input_key or input_key in question:
@@ -282,7 +286,9 @@ def _find_matching_results(question: str, question_results: dict[str, list]) -> 
     return []
 
 
-def _print_question_metrics(idx: int, q_data: dict, matching_results: list) -> None:
+def _print_question_metrics(
+    idx: int, q_data: dict[str, Any], matching_results: list[dict[str, Any]]
+) -> None:
     """Print detailed metrics for a single question."""
     question = q_data["question"]
     expected_quality = q_data["expected_quality"]
@@ -309,7 +315,7 @@ def _print_question_metrics(idx: int, q_data: dict, matching_results: list) -> N
         print(f"     └─ {reason}")
 
 
-def _print_metrics_summary(stats: list) -> None:
+def _print_metrics_summary(stats: list[dict[str, Any]]) -> None:
     """Print overall summary statistics."""
     print("\n" + "=" * 80)
     print("SUMMARY STATISTICS")
@@ -331,7 +337,7 @@ def _print_metrics_summary(stats: list) -> None:
         print(f"   • Pass Rate: {pass_rate:.1f}% ({passed}/{total})")
 
 
-def print_detailed_results(status_data: dict, run_id: int) -> None:
+def print_detailed_results(status_data: dict[str, Any], run_id: int | None) -> None:
     """Print detailed evaluation results grouped by expected quality."""
     print("\n" + "=" * 80)
     print(f"EVALUATION RESULTS - Run ID: {run_id}")
@@ -347,7 +353,7 @@ def print_detailed_results(status_data: dict, run_id: int) -> None:
     # Match questions with expected quality
     print("\nDETAILED RESULTS:")
     for q_idx, q_data in enumerate(MIXED_QUALITY_DATASET["questions"]):
-        question = q_data["question"]
+        question = str(q_data["question"])
         matching_results = _find_matching_results(question, question_results)
 
         if not matching_results:

@@ -70,6 +70,7 @@ exclude = [
     "__pypackages__",
     "dist",
     "venv",
+    "migrations",
 ]
 
 [tool.ruff.lint]
@@ -97,6 +98,7 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_return_any = true
 warn_unused_ignores = true
+exclude = ["migrations"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
