@@ -1,10 +1,17 @@
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.db import get_db
-from src.schemas.models import DatasetConfig, EvaluationRequest, GenerateDatasetRequest, RAGTestCase
+from src.schemas.models import (
+    DatasetConfig,
+    EvaluationRequest,
+    EvaluationResponse,
+    GenerateDatasetRequest,
+    RAGTestCase,
+)
 from src.services.dataset_service import DatasetService
 from src.services.evaluation_service import EvaluationService
 
@@ -39,8 +46,8 @@ async def generate_dataset(
 @rag_router.post("/datasets/upload")
 async def upload_dataset(
     config: DatasetConfig,
+    background_tasks: BackgroundTasks,
     run_eval: bool = False,
-    background_tasks: BackgroundTasks | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     service = DatasetService(db)
@@ -99,43 +106,100 @@ async def run_evaluation(
     return {"run_id": run.id, "status": "pending"}
 
 
-@rag_router.get("/evaluations/{run_id}")
-async def get_evaluation_status(run_id: int, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
-    # Simple polling endpoint
-    # We need to implement get_run in service or query here
-    from sqlalchemy import select
-    from sqlalchemy.orm import selectinload
-
-    from src.models.evaluation import EvaluationRun
-
-    stmt = (
-        select(EvaluationRun)
-        .options(selectinload(EvaluationRun.results))
-        .where(EvaluationRun.id == run_id)
-    )
-    result = await db.execute(stmt)
-    run = result.scalar_one_or_none()
-
-    if not run:
+@rag_router.get("/evaluations/{run_id}", response_model=EvaluationResponse)
+async def get_evaluation_status(run_id: int, db: AsyncSession = Depends(get_db)) -> Any:
+    service = EvaluationService(db)
+    response = await service.get_run_with_analytics(run_id)
+    if not response:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    results_data = [
-        {
-            "metric": res.metric_name,
-            "score": res.score,
-            "reason": res.reason,
-            "input": res.input[:50] + "..." if res.input else None,
-        }
-        for res in run.results
-    ]
+    # Truncate long strings for API response to keep payload small
+    for res in response.results:
+        # Pydantic models are not dicts, modify attributes directly
+        if res.input and len(res.input) > 200:
+            res.input = res.input[:200] + "..."
+        if res.output and len(res.output) > 200:
+            res.output = res.output[:200] + "..."
 
-    return {
-        "id": run.id,
-        "status": run.status,
-        "metrics": run.metrics_used,
-        "created_at": run.created_at.strftime("%d %m %Y") if run.created_at else None,
-        "results": results_data,
-    }
+    return response
+
+
+@rag_router.get("/evaluations/{run_id}/download")
+async def download_evaluation_report(
+    run_id: int, format: Literal["csv", "xlsx"] = "xlsx", db: AsyncSession = Depends(get_db)
+) -> Response:
+    service = EvaluationService(db)
+    data = await service.get_run_with_analytics(run_id)
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    from io import BytesIO
+
+    import pandas as pd
+
+    # Flatten results for DataFrame
+    rows = []
+    for res in data.results:
+        rows.append(
+            {
+                "Input": res.input,
+                "Output": res.output,
+                "Metric": res.metric,
+                "Score": res.score,
+                "Reason": res.reason,
+            }
+        )
+
+    df = pd.DataFrame(rows)
+
+    # Create filename
+    # Sanitize created_at for filename
+    date_str = data.created_at.replace(" ", "_").replace(":", "-").replace(".", "-")
+    filename = f"report_run_{run_id}_{date_str}"
+
+    if format == "csv":
+        # Simple CSV
+        stream = BytesIO()
+        df.to_csv(stream, index=False)
+        stream.seek(0)
+        return StreamingResponse(
+            stream,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}.csv"},
+        )
+
+    elif format == "xlsx":
+        stream = BytesIO()
+        # Ensure openpyxl is installed (we added it)
+        with pd.ExcelWriter(stream, engine="openpyxl") as writer:
+            # Sheet 1: Summary
+            summary_data = {
+                "Run ID": [data.id],
+                "Model": [data.model_name],
+                "Date": [data.created_at],
+                "Duration (s)": [data.duration_seconds],
+                "Avg Speed (s/q)": [data.avg_seconds_per_question],
+                "Status": [data.status],
+            }
+            # Add metric stats to summary
+            for m in data.metrics_stats:
+                summary_data[f"{m.name} Avg"] = [m.avg_score]
+                summary_data[f"{m.name} Pass Rate"] = [m.pass_rate]
+
+            pd.DataFrame(summary_data).to_excel(writer, sheet_name="Summary", index=False)
+
+            # Sheet 2: Detailed Results
+            df.to_excel(writer, sheet_name="Details", index=False)
+
+        stream.seek(0)
+        return StreamingResponse(
+            stream,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"},
+        )
+
+    raise HTTPException(status_code=400, detail="Invalid format")
 
 
 @rag_router.get("/template")

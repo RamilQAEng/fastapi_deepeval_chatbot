@@ -36,6 +36,7 @@ class EvaluationRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     metrics_used: Mapped[list[str]] = mapped_column(JSON)
+    model_name: Mapped[str] = mapped_column(String, nullable=True)
 
     dataset: Mapped["Dataset"] = relationship(back_populates="runs")
     results: Mapped[list["EvaluationResult"]] = relationship(back_populates="run")
