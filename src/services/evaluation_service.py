@@ -11,9 +11,12 @@ from deepeval.models import GPTModel
 from deepeval.test_case import LLMTestCase
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.core.config import settings
+from src.metrics import russian  # noqa: F401 - Apply Russian localization patches
 from src.models.evaluation import Dataset, EvaluationResult, EvaluationRun, RunStatus
+from src.schemas.models import EvaluationResponse, EvaluationResultItem, MetricStats
 
 
 class EvaluationService:
@@ -21,7 +24,14 @@ class EvaluationService:
         self.db = db
 
     async def create_run(self, dataset_id: int, metrics: list[str]) -> EvaluationRun:
-        run = EvaluationRun(dataset_id=dataset_id, metrics_used=metrics, status=RunStatus.PENDING)
+        # Capture current model from settings to store in history
+        current_model = settings.DEEPEVAL_OPENAI_MODEL
+        run = EvaluationRun(
+            dataset_id=dataset_id,
+            metrics_used=metrics,
+            model_name=current_model,
+            status=RunStatus.PENDING,
+        )
         self.db.add(run)
         await self.db.commit()
         await self.db.refresh(run)
@@ -102,3 +112,87 @@ class EvaluationService:
 
         run.finished_at = datetime.now(ZoneInfo("UTC"))
         await self.db.commit()
+
+    async def get_run_with_analytics(self, run_id: int) -> Any:
+        # Avoid circular imports if possible, or use string forward refs
+        stmt = (
+            select(EvaluationRun)
+            .options(selectinload(EvaluationRun.results))
+            .where(EvaluationRun.id == run_id)
+        )
+        result = await self.db.execute(stmt)
+        run = result.scalar_one_or_none()
+
+        if not run:
+            return None
+
+        # 1. Timing Stats
+        duration_seconds = None
+        avg_seconds_per_question = None
+
+        if run.finished_at and run.created_at:
+            delta = run.finished_at - run.created_at
+            duration_seconds = round(delta.total_seconds(), 2)
+
+            # Count unique inputs (questions)
+            unique_inputs = {res.input for res in run.results}
+            total_questions = len(unique_inputs) if unique_inputs else 1
+
+            if total_questions > 0:
+                avg_seconds_per_question = round(duration_seconds / total_questions, 2)
+
+        # 2. Results & Metrics Aggregation
+        results_data = []
+        metric_scores: dict[str, list[float]] = {m: [] for m in run.metrics_used}
+
+        for res in run.results:
+            results_data.append(
+                EvaluationResultItem(
+                    metric=res.metric_name,
+                    score=res.score,
+                    reason=res.reason,
+                    input=res.input,  # Keep full input for internal use, truncate in API if needed
+                    output=res.output,
+                )
+            )
+            # Collect stats
+            if res.metric_name:
+                metric_scores.setdefault(res.metric_name, []).append(res.score)
+
+        # 3. Calculate Stats
+        metrics_stats = []
+        threshold = 0.5
+
+        for metric_name, scores in metric_scores.items():
+            if not scores:
+                continue
+
+            count = len(scores)
+            passed = sum(1 for s in scores if s >= threshold)
+            avg_score = sum(scores) / count
+
+            metrics_stats.append(
+                MetricStats(
+                    name=metric_name,
+                    avg_score=round(avg_score, 2),
+                    pass_rate=round(passed / count, 2),
+                    passed_count=passed,
+                    total_count=count,
+                )
+            )
+
+        # 4. Date Formatting
+        created_at_fmt = run.created_at.strftime("%d.%m.%Y %H:%M") if run.created_at else ""
+        finished_at_fmt = run.finished_at.strftime("%d.%m.%Y %H:%M") if run.finished_at else None
+
+        return EvaluationResponse(
+            id=run.id,
+            status=run.status,
+            model_name=getattr(run, "model_name", None),
+            created_at=created_at_fmt,
+            finished_at=finished_at_fmt,
+            duration_seconds=duration_seconds,
+            avg_seconds_per_question=avg_seconds_per_question,
+            metrics_stats=metrics_stats,
+            results=results_data,
+        )

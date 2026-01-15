@@ -1,5 +1,5 @@
 
-# 🧠 RAG Evaluation System (Pet Project)
+#  RAG Evaluation System (Pet Project)
 
 A robust, production-ready system to **generate**, **manage**, and **evaluate** synthetic datasets for RAG (Retrieval-Augmented Generation) pipelines.
 
@@ -9,7 +9,7 @@ Built with **FastAPI**, **PostgreSQL**, **DeepEval**, and **OpenRouter**.
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 
-## 🚀 Features
+##  Features
 
 *   **Synthetic Data Generation**: Automatically create Q&A pairs from raw text context using LLMs (via OpenRouter).
 *   **Automated Evaluation**: Run DeepEval metrics (Faithfulness, Answer Relevancy) in background tasks.
@@ -18,7 +18,7 @@ Built with **FastAPI**, **PostgreSQL**, **DeepEval**, and **OpenRouter**.
 *   **Persistence**: All datasets, runs, and results are stored in PostgreSQL.
 *   **Async Architecture**: Fully asynchronous API and Database interactions for high performance.
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 *   **Backend**: Python 3.12, FastAPI, SQLAlchemy (Async), Pydantic V2.
 *   **Database**: PostgreSQL 16 (via Docker).
@@ -26,7 +26,7 @@ Built with **FastAPI**, **PostgreSQL**, **DeepEval**, and **OpenRouter**.
 *   **Migration**: Alembic.
 *   **Package Manager**: Poetry.
 
-## 🏃‍♂️ Quick Start
+##  Quick Start
 
 ### Prerequisites
 *   Docker & Docker Compose
@@ -63,7 +63,7 @@ poetry run alembic upgrade head
 poetry run uvicorn src.api.main:app --reload --loop asyncio
 ```
 
-## 📚 API Documentation
+##  API Documentation
 
 ### 1. Generate Dataset
 **POST** `/api/v1/datasets/generate`
@@ -82,7 +82,7 @@ Upload a pre-made JSON dataset and immediately trigger evaluation.
 **GET** `/api/v1/evaluations/{run_id}`
 Returns status (`pending`, `completed`, `failed`) and detailed metric scores/reasons.
 
-## 🏗 Project Structure
+## Project Structure
 
 ```
 .
@@ -100,26 +100,53 @@ Returns status (`pending`, `completed`, `failed`) and detailed metric scores/rea
 └── README.md
 ```
 
-## 🔄 CI/CD & Testing
+## Тестирование и Верификация
 
-### Verification Scripts
-We have included automated scripts to test the entire pipeline:
+### 1. Запуск Юнит-тестов
+Обычный запуск всех тестов через pytest:
 ```bash
-# Test Upload & Eval
-poetry run python tests/verify_upload.py
-
-# Test Generation & Eval
-poetry run python tests/verify_pipeline.py
+poetry run pytest
 ```
 
-### CI Pipeline (GitHub Actions)
-See `.github/workflows/ci.yml`. Triggers on push to `main`.
-1.  Sets up Python & Poetry.
-2.  Runs Linting (`ruff`, `black`).
-3.  Runs Type Checking (`mypy`).
-4.  Runs Unit Tests (`pytest`).
+### 2. Скрипты Верификации (End-to-End)
+В проекте есть готовые скрипты для проверки работы всего пайплайна (БД -> LLM -> API).
 
-## 🇷🇺 Localization
+| Скрипт | Описание | Команда |
+|--------|----------|---------|
+| `tests/verify_pipeline.py` | **Базовая проверка**: Генерация датасета из текста + Запуск оценки. | `poetry run python tests/verify_pipeline.py` |
+| `tests/verify_analytics.py` | **Проверка Аналитики**: Выводит детальную статистику последнего прогона (скорость, pass rate). | `poetry run python tests/verify_analytics.py` |
+| `tests/verify_mixed_quality.py` | **Стресс-тест**: Создает датасет с хорошими, средними и плохими ответами, чтобы проверить, как метрики их различают. | `poetry run python tests/verify_mixed_quality.py` |
+
+> **Важно**: Для работы скриптов должны быть запущены контейнеры (`docker-compose up`) или локальный сервер.
+
+### 3. Миграции Базы Данных
+Если вы меняли модели, не забудьте обновить базу:
+```bash
+# Применить все миграции (до актуальной версии)
+poetry run alembic upgrade head
+
+# Создать новую миграцию (автоматически)
+poetry run alembic revision --autogenerate -m "description"
+```
+
+### 4. CI Pipeline (GitHub Actions)
+В `.github/workflows/ci.yml` настроен автоматический запуск на каждый push в `main`:
+1.  **Linting**: `ruff`, `black`
+2.  **Type Checking**: `mypy`
+3.  **Unit Tests**: `pytest`
+
+### 5. Pre-commit (Линтинг)
+Для проверки кода перед коммитом (чтобы не пушить ошибки):
+
+```bash
+# Установка хуков (один раз)
+poetry run pre-commit install
+
+# Запуск проверки вручную (для всех файлов)
+poetry run pre-commit run --all-files
+```
+
+##  Localization
 To ensure evaluation reasons are in Russian, we use custom overrides in `src/metrics/russian.py`. This patches `DeepEval`'s prompt templates dynamically.
 
 ---

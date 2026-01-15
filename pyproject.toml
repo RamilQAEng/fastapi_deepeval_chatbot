@@ -25,6 +25,7 @@ httpx = "^0.26.0"
 deepeval = "^3.7.9"
 pandas = "^2.3.3"
 greenlet = "^3.3.0"
+openpyxl = "^3.1.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
@@ -69,6 +70,7 @@ exclude = [
     "__pypackages__",
     "dist",
     "venv",
+    "migrations",
 ]
 
 [tool.ruff.lint]
@@ -96,6 +98,7 @@ disallow_untyped_decorators = true
 no_implicit_optional = true
 warn_return_any = true
 warn_unused_ignores = true
+exclude = ["migrations"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
