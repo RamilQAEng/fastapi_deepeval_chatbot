@@ -100,49 +100,49 @@ Returns status (`pending`, `completed`, `failed`) and detailed metric scores/rea
 └── README.md
 ```
 
-## Тестирование и Верификация
+## Testing and Verification
 
-### 1. Запуск Юнит-тестов
-Обычный запуск всех тестов через pytest:
+### 1. Running Unit Tests
+Run all tests using pytest:
 ```bash
 poetry run pytest
 ```
 
-### 2. Скрипты Верификации (End-to-End)
-В проекте есть готовые скрипты для проверки работы всего пайплайна (БД -> LLM -> API).
+### 2. Verification Scripts (End-to-End)
+The project includes ready-made scripts to verify the entire pipeline (DB -> LLM -> API).
 
-| Скрипт | Описание | Команда |
-|--------|----------|---------|
-| `tests/verify_pipeline.py` | **Базовая проверка**: Генерация датасета из текста + Запуск оценки. | `poetry run python tests/verify_pipeline.py` |
-| `tests/verify_analytics.py` | **Проверка Аналитики**: Выводит детальную статистику последнего прогона (скорость, pass rate). | `poetry run python tests/verify_analytics.py` |
-| `tests/verify_mixed_quality.py` | **Стресс-тест**: Создает датасет с хорошими, средними и плохими ответами, чтобы проверить, как метрики их различают. | `poetry run python tests/verify_mixed_quality.py` |
+| Script | Description | Command |
+|--------|-------------|---------|
+| `tests/verify_pipeline.py` | **Basic Check**: Generate dataset from text + Run evaluation. | `poetry run python tests/verify_pipeline.py` |
+| `tests/verify_analytics.py` | **Analytics Check**: Outputs detailed statistics of the last run (speed, pass rate). | `poetry run python tests/verify_analytics.py` |
+| `tests/verify_mixed_quality.py` | **Stress Test**: Creates a dataset with good, medium, and poor answers to verify metric discrimination. | `poetry run python tests/verify_mixed_quality.py` |
 
-> **Важно**: Для работы скриптов должны быть запущены контейнеры (`docker-compose up`) или локальный сервер.
+> **Important**: Containers (`docker-compose up`) or a local server must be running for scripts to work.
 
-### 3. Миграции Базы Данных
-Если вы меняли модели, не забудьте обновить базу:
+### 3. Database Migrations
+If you changed models, don't forget to update the database:
 ```bash
-# Применить все миграции (до актуальной версии)
+# Apply all migrations (to head)
 poetry run alembic upgrade head
 
-# Создать новую миграцию (автоматически)
+# Create a new migration (automatically)
 poetry run alembic revision --autogenerate -m "description"
 ```
 
 ### 4. CI Pipeline (GitHub Actions)
-В `.github/workflows/ci.yml` настроен автоматический запуск на каждый push в `main`:
+Automatic checks are configured in `.github/workflows/ci.yml` for every push to `main`:
 1.  **Linting**: `ruff`, `black`
 2.  **Type Checking**: `mypy`
 3.  **Unit Tests**: `pytest`
 
-### 5. Pre-commit (Линтинг)
-Для проверки кода перед коммитом (чтобы не пушить ошибки):
+### 5. Pre-commit (Linting)
+To check code before committing (to avoid pushing errors):
 
 ```bash
-# Установка хуков (один раз)
+# Install hooks (once)
 poetry run pre-commit install
 
-# Запуск проверки вручную (для всех файлов)
+# Run checks manually (for all files)
 poetry run pre-commit run --all-files
 ```
 
